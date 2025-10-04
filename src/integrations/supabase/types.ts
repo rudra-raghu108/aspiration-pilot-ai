@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      jobs: {
+        Row: {
+          id: string
+          title: string
+          company: string
+          description: string | null
+          required_skills: string[]
+          location: string | null
+          salary_range: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          company: string
+          description?: string | null
+          required_skills?: string[]
+          location?: string | null
+          salary_range?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          company?: string
+          description?: string | null
+          required_skills?: string[]
+          location?: string | null
+          salary_range?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       career_chats: {
         Row: {
           content: string
@@ -129,6 +165,35 @@ export type Database = {
           target_position: string | null
           updated_at: string | null
           user_id: string
+          parsed_resume: Json | null
+          job_matches: Json | null
+          skills: string[] | null
+          career_goals: {
+            shortTerm: string[]
+            longTerm: string[]
+            targetRoles: string[]
+            industries: string[]
+          } | null
+          job_preferences: {
+            preferredLocations: string[]
+            minimumSalary: number
+            remoteOnly: boolean
+            industries: string[]
+            companyTypes: string[]
+          } | null
+          skill_assessments: {
+            skill: string
+            level: number
+            lastAssessed: string
+            endorsements: number
+          }[] | null
+          career_progression: {
+            date: string
+            title: string
+            company: string
+            achievements: string[]
+            skillsGained: string[]
+          }[] | null
         }
         Insert: {
           avatar_url?: string | null
@@ -142,6 +207,13 @@ export type Database = {
           target_position?: string | null
           updated_at?: string | null
           user_id: string
+          parsed_resume?: Json | null
+          job_matches?: Json | null
+          skills?: string[] | null
+          career_goals?: Json | null
+          job_preferences?: Json | null
+          skill_assessments?: Json | null
+          career_progression?: Json | null
         }
         Update: {
           avatar_url?: string | null
@@ -155,6 +227,13 @@ export type Database = {
           target_position?: string | null
           updated_at?: string | null
           user_id?: string
+          parsed_resume?: Json | null
+          job_matches?: Json | null
+          skills?: string[] | null
+          career_goals?: Json | null
+          job_preferences?: Json | null
+          skill_assessments?: Json | null
+          career_progression?: Json | null
         }
         Relationships: []
       }
