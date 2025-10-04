@@ -7,12 +7,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/AuthProvider";
 
-const Auth = () => {
+const SimpleAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+
+  const { signIn } = useAuth();
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -23,35 +25,19 @@ const Auth = () => {
       const email = formData.get("email") as string;
       const password = formData.get("password") as string;
 
-      // Try to sign in
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email, 
-        password 
+      await signIn(email, password);
+
+      toast({
+        title: "Welcome back!",
+        description: "Login successful.",
       });
 
-      if (error) throw error;
-
-      if (data.user) {
-        // Create or update profile
-        await supabase.from('profiles').upsert({ 
-          user_id: data.user.id,
-          email: data.user.email,
-          full_name: email.split('@')[0],
-          updated_at: new Date().toISOString()
-        });
-
-        toast({
-          title: "Welcome back!",
-          description: "You've successfully logged in.",
-        });
-        
-        navigate("/dashboard");
-      }
-    } catch (error) {
+      navigate("/dashboard");
+    } catch (error: any) {
       console.error('Login error:', error);
       toast({
         title: "Login Failed",
-        description: "Please check your email and password",
+        description: "Please check your credentials and try again",
         variant: "destructive",
       });
     } finally {
@@ -59,78 +45,31 @@ const Auth = () => {
     }
   };
 
+  const { signUp } = useAuth();
+
   const handleSignup = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
       const formData = new FormData(e.currentTarget);
-      const name = formData.get("name") as string;
       const email = formData.get("email") as string;
       const password = formData.get("password") as string;
+      const name = formData.get("name") as string;
 
-      // Direct signup - no profile check
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: name },
-          emailRedirectTo: `${window.location.origin}/dashboard`
-        }
+      await signUp(email, password, name);
+
+      toast({
+        title: "Account created!",
+        description: "Welcome to CareerPath AI",
       });
 
-      if (error) {
-        // If it's because the user exists, let's log them in
-        if (error.message.includes('already exists')) {
-          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-            email,
-            password
-          });
-
-          if (loginError) {
-            toast({
-              title: "Account Exists",
-              description: "An account with this email exists. Please use the login form.",
-              variant: "destructive",
-            });
-            return;
-          }
-
-          if (loginData.user) {
-            toast({
-              title: "Welcome back!",
-              description: "Successfully logged in with existing account.",
-            });
-            navigate("/dashboard");
-          }
-        } else {
-          throw error;
-        }
-      } else if (data.user) {
-        // Immediately create a profile for the new user
-        const { error: profileError } = await supabase.from('profiles').insert({
-          user_id: data.user.id,
-          email: email,
-          full_name: name,
-          updated_at: new Date().toISOString()
-        });
-
-        if (profileError) {
-          console.error('Profile creation failed:', profileError);
-          // Continue anyway - profile can be created later
-        }
-
-        toast({
-          title: "Success!",
-          description: "Account created successfully!",
-        });
-        navigate("/dashboard");
-      }
-    } catch (error) {
+      navigate("/dashboard");
+    } catch (error: any) {
       console.error('Signup error:', error);
       toast({
-        title: "Error",
-        description: "Failed to create account. Please try again.",
+        title: "Signup Failed",
+        description: error.message || "Please try again with different credentials",
         variant: "destructive",
       });
     } finally {
@@ -187,7 +126,7 @@ const Auth = () => {
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Signing in..." : "Sign In"}
+                    {isLoading ? "Please wait..." : "Sign In"}
                   </Button>
                 </form>
               </TabsContent>
@@ -222,16 +161,7 @@ const Auth = () => {
                       type="password"
                       placeholder="••••••••"
                       required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-confirm">Confirm Password</Label>
-                    <Input
-                      id="signup-confirm"
-                      name="confirmPassword"
-                      type="password"
-                      placeholder="••••••••"
-                      required
+                      minLength={6}
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
@@ -247,4 +177,4 @@ const Auth = () => {
   );
 };
 
-export default Auth;
+export default SimpleAuth;

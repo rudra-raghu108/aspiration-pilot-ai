@@ -9,49 +9,69 @@ import { Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-const Auth = () => {
+const NewAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>("");
+
+  // Debug helper
+  const logDebug = (message: string) => {
+    console.log(message);
+    setDebugInfo(prev => `${prev}\n${message}`);
+  };
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
+    setDebugInfo("");
 
     try {
       const formData = new FormData(e.currentTarget);
       const email = formData.get("email") as string;
       const password = formData.get("password") as string;
 
-      // Try to sign in
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email, 
-        password 
+      logDebug("Attempting login...");
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
 
       if (error) throw error;
 
       if (data.user) {
-        // Create or update profile
-        await supabase.from('profiles').upsert({ 
-          user_id: data.user.id,
-          email: data.user.email,
-          full_name: email.split('@')[0],
-          updated_at: new Date().toISOString()
-        });
+        logDebug("Login successful, creating/updating profile...");
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: data.user.id,
+            email: data.user.email,
+            full_name: data.user.user_metadata?.full_name || email.split('@')[0],
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (profileError) {
+          logDebug(`Profile error: ${profileError.message}`);
+          // Don't throw, just log
+          console.error('Profile error:', profileError);
+        }
 
         toast({
-          title: "Welcome back!",
-          description: "You've successfully logged in.",
+          title: "Success!",
+          description: "You've been logged in.",
         });
-        
+
         navigate("/dashboard");
       }
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (error: any) {
+      logDebug(`Login error: ${error.message}`);
       toast({
         title: "Login Failed",
-        description: "Please check your email and password",
+        description: error.message || "Please check your credentials",
         variant: "destructive",
       });
     } finally {
@@ -62,6 +82,7 @@ const Auth = () => {
   const handleSignup = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
+    setDebugInfo("");
 
     try {
       const formData = new FormData(e.currentTarget);
@@ -69,68 +90,77 @@ const Auth = () => {
       const email = formData.get("email") as string;
       const password = formData.get("password") as string;
 
-      // Direct signup - no profile check
+      logDebug("Starting signup process...");
+
+      // First, check if user exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('email', email)
+        .single();
+
+      if (existingUser) {
+        logDebug("User already exists, attempting login...");
+        // User exists, try to log in
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (loginError) throw loginError;
+
+        toast({
+          title: "Welcome back!",
+          description: "Logged in with existing account.",
+        });
+        
+        navigate("/dashboard");
+        return;
+      }
+
+      logDebug("Creating new account...");
+
+      // Create new user
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { full_name: name },
-          emailRedirectTo: `${window.location.origin}/dashboard`
+          data: { full_name: name }
         }
       });
 
-      if (error) {
-        // If it's because the user exists, let's log them in
-        if (error.message.includes('already exists')) {
-          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-            email,
-            password
+      if (error) throw error;
+
+      if (data.user) {
+        logDebug("Account created, setting up profile...");
+
+        // Create profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: data.user.id,
+            email: email,
+            full_name: name,
+            updated_at: new Date().toISOString()
           });
 
-          if (loginError) {
-            toast({
-              title: "Account Exists",
-              description: "An account with this email exists. Please use the login form.",
-              variant: "destructive",
-            });
-            return;
-          }
-
-          if (loginData.user) {
-            toast({
-              title: "Welcome back!",
-              description: "Successfully logged in with existing account.",
-            });
-            navigate("/dashboard");
-          }
-        } else {
-          throw error;
-        }
-      } else if (data.user) {
-        // Immediately create a profile for the new user
-        const { error: profileError } = await supabase.from('profiles').insert({
-          user_id: data.user.id,
-          email: email,
-          full_name: name,
-          updated_at: new Date().toISOString()
-        });
-
         if (profileError) {
-          console.error('Profile creation failed:', profileError);
-          // Continue anyway - profile can be created later
+          logDebug(`Profile creation error: ${profileError.message}`);
+          console.error('Profile creation error:', profileError);
         }
 
         toast({
-          title: "Success!",
-          description: "Account created successfully!",
+          title: "Account Created!",
+          description: "Welcome to CareerPath AI!",
         });
+        
         navigate("/dashboard");
       }
-    } catch (error) {
-      console.error('Signup error:', error);
+    } catch (error: any) {
+      logDebug(`Signup error: ${error.message}`);
       toast({
-        title: "Error",
-        description: "Failed to create account. Please try again.",
+        title: "Signup Failed",
+        description: error.message || "Please try again with different credentials",
         variant: "destructive",
       });
     } finally {
@@ -187,7 +217,7 @@ const Auth = () => {
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Signing in..." : "Sign In"}
+                    {isLoading ? "Please wait..." : "Sign In"}
                   </Button>
                 </form>
               </TabsContent>
@@ -222,16 +252,7 @@ const Auth = () => {
                       type="password"
                       placeholder="••••••••"
                       required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-confirm">Confirm Password</Label>
-                    <Input
-                      id="signup-confirm"
-                      name="confirmPassword"
-                      type="password"
-                      placeholder="••••••••"
-                      required
+                      minLength={6}
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
@@ -240,6 +261,13 @@ const Auth = () => {
                 </form>
               </TabsContent>
             </Tabs>
+
+            {/* Debug Information */}
+            {debugInfo && (
+              <div className="mt-4 p-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap">
+                {debugInfo}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -247,4 +275,4 @@ const Auth = () => {
   );
 };
 
-export default Auth;
+export default NewAuth;

@@ -6,16 +6,57 @@ import {
   Target,
   Briefcase,
   BookOpen,
-  ArrowRight,
   Sparkles,
   CheckCircle,
 } from "lucide-react";
+import { CareerDashboardTabs } from "@/components/dashboard/CareerDashboardTabs";
+
+import { ProfileEdit } from "@/components/profile/ProfileEdit";
+import { ResumeUpload } from "@/components/profile/ResumeUpload";
+import { analyzeCareerPath } from "@/lib/ai-services";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 const Dashboard = () => {
-  const careerScore = 75;
-  const skillsCompleted = 12;
-  const skillsTotal = 20;
-  const applicationsCount = 8;
+  const navigate = useNavigate();
+  const { user, loading } = useAuth();
+  const [careerScore, setCareerScore] = useState(75);
+  const [skillsCompleted, setSkillsCompleted] = useState(12);
+  const [skillsTotal, setSkillsTotal] = useState(20);
+  const [applicationsCount, setApplicationsCount] = useState(8);
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [showResumeUpload, setShowResumeUpload] = useState(false);
+  
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
+  
+  useEffect(() => {
+    const loadUserData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Load profile data
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("user_id", user.id)
+          .single();
+
+        if (profile) {
+          // Get AI analysis
+          const analysis = await analyzeCareerPath(profile);
+          // Update UI with real data
+          // TODO: Update stats based on analysis
+        }
+      }
+    };
+
+    loadUserData();
+  }, []);
 
   const recommendations = [
     {
@@ -104,51 +145,13 @@ const Dashboard = () => {
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recommendations */}
+          {/* Career Dashboard Tabs */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-foreground">
-                Recommended Actions
-              </h2>
-              <Button variant="ghost" size="sm">
-                View All
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
-            </div>
-
-            {recommendations.map((rec, index) => (
-              <Card key={index} className="card-hover">
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
-                      {rec.icon}
-                    </div>
-                    <div className="flex-1 space-y-3">
-                      <div>
-                        <h3 className="font-semibold text-foreground mb-1">
-                          {rec.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {rec.description}
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Progress</span>
-                          <span className="font-medium text-foreground">
-                            {rec.progress}%
-                          </span>
-                        </div>
-                        <Progress value={rec.progress} className="h-2" />
-                      </div>
-                      <Button size="sm" variant="outline">
-                        Continue
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            <Card>
+              <CardContent className="p-6">
+                <CareerDashboardTabs />
+              </CardContent>
+            </Card>
           </div>
 
           {/* Side Panel */}
@@ -197,20 +200,52 @@ const Dashboard = () => {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setShowProfileEdit(true)}
+                >
                   <Briefcase className="mr-2 w-4 h-4" />
-                  Browse Jobs
+                  Edit Profile
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setShowResumeUpload(true)}
+                >
                   <BookOpen className="mr-2 w-4 h-4" />
-                  Explore Courses
+                  Upload Resume
                 </Button>
                 <Button variant="outline" className="w-full justify-start">
                   <Target className="mr-2 w-4 h-4" />
-                  Set New Goals
+                  View AI Analysis
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Profile Edit Dialog */}
+            {showProfileEdit && (
+              <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50">
+                <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg">
+                  <ProfileEdit />
+                  <Button variant="outline" onClick={() => setShowProfileEdit(false)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Resume Upload Dialog */}
+            {showResumeUpload && (
+              <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50">
+                <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg">
+                  <ResumeUpload />
+                  <Button variant="outline" onClick={() => setShowResumeUpload(false)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
