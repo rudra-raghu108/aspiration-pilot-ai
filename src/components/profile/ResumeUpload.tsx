@@ -57,7 +57,7 @@ export function ResumeUpload() {
       // Update user profile with resume URL
       await supabase
         .from('profiles')
-        .update({ resume_url: publicUrl } as any)
+        .update({ resume_url: publicUrl } as Record<string, unknown>)
         .eq('user_id', user.id);
 
       toast({
@@ -68,12 +68,20 @@ export function ResumeUpload() {
       // Trigger resume parsing and analysis
       const parsedResume = await parseResume(publicUrl);
       const jobMatches = await findJobMatches(parsedResume);
-      
+
+      const enrichedMatches = jobMatches.slice(0, 10).map((match) => ({
+        ...match,
+        saved: false,
+      }));
+
       // Store parsed resume data and job matches
-      await supabase.from('profiles').update({
-        parsed_resume: parsedResume,
-        job_matches: jobMatches.slice(0, 10) // Store top 10 matches
-      } as any).eq('user_id', user.id);
+      await supabase
+        .from('profiles')
+        .update({
+          parsed_resume: parsedResume,
+          job_matches: enrichedMatches, // Store top 10 matches with saved flag
+        } as Record<string, unknown>)
+        .eq('user_id', user.id);
 
       toast({
         title: "Resume Analyzed",
